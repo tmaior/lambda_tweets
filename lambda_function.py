@@ -16,7 +16,7 @@ CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET")
 CONSUMER_KEY = os.environ.get("CONSUMER_KEY")
 
 # Nome ou ARN da função Lambda de destino
-function_name = 'aiidea-llc-dev-lambda-proccess_data'
+function_name = 'aiidea-llc-dev-lambda-process-data'
 
 # Initialize Tweepy Client
 client = tweepy.Client(bearer_token=BEARER_TOKEN)
@@ -27,42 +27,47 @@ def fetch_tweets(query, count=100):
         tweets = client.search_recent_tweets(query=query, tweet_fields=['author_id', 'lang', 'created_at'])
         return tweets.data
     except:
-        print(error)
+        return error
 
-def handler(context, event):
+def handler(event, context):
     try:
-        
-        tweets = fetch_tweets(context['query'])
-        data_list = []
-        for tweet in tweets:
-            data = {
-                "ID": tweet.id,
-                "Raw_Content": tweet.text
+
+        if 'queryStringParameters' in event:
+            query_parameters = event['queryStringParameters']
+            if 'query' in query_parameters:
+                query_value = query_parameters['query']
+      
+                tweets = fetch_tweets(query_value)
+                
+                data_list = []
+                for tweet in tweets:
+                    data = {
+                        "ID": tweet.id,
+                        "Raw_Content": tweet.text
+                    }
+                    data_list.append(data)
+                
+         
+                response = lambda_client.invoke(
+                    FunctionName=function_name,
+                    InvocationType='RequestResponse',
+                    Payload=json.dumps(data_list)
+                )
+                
+
+                return {
+                    "statusCode": 201,
+                    "body": json.dumps(response)
+                }
+        else:
+            return {
+                "statusCode": 400,
+                "body": "'Query' param not found in the url."
             }
-            data_list.append(data)
-        
-        # Chamar a função Lambda
-        response = lambda_client.invoke(
-            FunctionName=function_name,
-            InvocationType='RequestResponse',  # Use 'Event' para chamada assíncrona
-            Payload=json.dumps(data_list) # Converte os dados em JSON
-        )
-        
-        # Recuperar a resposta da função Lambda
-        response_payload = response['Payload'].read()
-        response_data = json.loads(response_payload)
-        
-   
-        # Processar a resposta
-        return {
-            "code": 200,
-            "body": json.dumps(response_data)
-        }
-  
     except Exception as error:
         print(error)
         return {
-            "code": 400,
+            "statusCode": 400,
             "body": "error"
         }
 
