@@ -57,7 +57,7 @@ def handler(event, context):
 
                 return {
                     "statusCode": 201,
-                    "body": json.dumps(response)
+                    "body": json.dumps("Data uploaded")
                 }
         else:
             return {
